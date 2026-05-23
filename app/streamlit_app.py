@@ -4,57 +4,267 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+import os
+
+# ======================
+# LOAD MODELS
+# ======================
+models_dir = os.path.join(os.path.dirname(__file__), "..", "models")
+scaler = None
+kmeans = None
+knn_model = None
+tree_model = None
+rf_model = None
+
+try:
+    scaler = joblib.load(os.path.join(models_dir, "scaler.pkl"))
+    kmeans = joblib.load(os.path.join(models_dir, "kmeans.pkl"))
+    knn_model = joblib.load(os.path.join(models_dir, "knn.pkl"))
+    tree_model = joblib.load(os.path.join(models_dir, "tree.pkl"))
+    rf_model = joblib.load(os.path.join(models_dir, "rf.pkl"))
+    models_loaded = True
+except:
+    models_loaded = False
 
 # ======================
 # PAGE CONFIG
 # ======================
 st.set_page_config(
-    page_title="Credit Card Customer Segmentation",
-    page_icon="💳",
-    layout="wide"
+    page_title="Customer Segmentation | Neural Analytics",
+    page_icon="◈",
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # ======================
-# CUSTOM CSS
+# CUSTOM CSS - Digital Banking Noir Theme
 # ======================
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root {
+        --bg-primary: #0a0a0f;
+        --bg-secondary: #12121a;
+        --bg-card: #1a1a24;
+        --bg-card-hover: #22222e;
+        --accent-cyan: #00f0ff;
+        --accent-magenta: #ff00aa;
+        --accent-gold: #ffd700;
+        --accent-green: #00ff88;
+        --text-primary: #ffffff;
+        --text-secondary: #8a8a9a;
+        --text-muted: #5a5a6a;
+        --border: #2a2a3a;
+        --glow-cyan: 0 0 20px rgba(0, 240, 255, 0.3);
+        --glow-magenta: 0 0 20px rgba(255, 0, 170, 0.3);
+    }
+
+    * {
+        font-family: 'Space Grotesk', -apple-system, sans-serif;
+    }
+
+    .stApp {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+    }
+
+    /* Main Title */
     .main-title {
-        font-size: 2.2rem;
-        font-weight: bold;
+        font-size: 2.5rem;
+        font-weight: 700;
         text-align: center;
-        color: #667eea;
-        padding: 20px 0;
+        background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        padding: 30px 0;
+        letter-spacing: -0.02em;
+        text-shadow: var(--glow-cyan);
     }
+
+    /* Section Headers */
     .section-header {
-        font-size: 1.3rem;
-        font-weight: bold;
-        color: #333;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--accent-cyan);
         padding: 15px 0 10px 0;
-        border-bottom: 2px solid #667eea;
+        border-bottom: 1px solid var(--border);
         margin-bottom: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
     }
+
+    /* Metric Cards */
     .metric-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 15px 25px;
-        border-radius: 10px;
-        color: white;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        padding: 20px 25px;
+        border-radius: 12px;
+        color: var(--text-primary);
         text-align: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
+    .metric-box:hover {
+        border-color: var(--accent-cyan);
+        box-shadow: var(--glow-cyan);
+        transform: translateY(-2px);
+    }
+    .metric-box h3 {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin: 0;
+    }
+    .metric-box h1 {
+        color: var(--accent-cyan);
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 10px 0 0 0;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Insight Boxes */
     .insight-box {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 4px solid #667eea;
+        background: var(--bg-card);
+        padding: 20px;
+        border-radius: 12px;
+        border-left: 3px solid var(--accent-magenta);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
-    footer {visibility: hidden;}
+
+    /* Sidebar */
+    .stSidebar {
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border);
+    }
+
+    /* Radio Button Styling */
+    .stRadio > div {
+        background: var(--bg-card);
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+    }
+    .stRadio label {
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+    .stRadio label:hover {
+        color: var(--accent-cyan);
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        background: var(--bg-card);
+        border-radius: 10px;
+        padding: 5px;
+        gap: 5px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta)) !important;
+        color: white !important;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 12px 30px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        box-shadow: var(--glow-cyan), var(--glow-magenta);
+        transform: scale(1.02);
+    }
+
+    /* Number Inputs */
+    .stNumberInput > div > div > input {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        color: var(--text-primary);
+        border-radius: 8px;
+    }
+    .stNumberInput > div > div > input:focus {
+        border-color: var(--accent-cyan);
+        box-shadow: var(--glow-cyan);
+    }
+
+    /* Dataframes */
+    .stDataFrame {
+        background: var(--bg-card);
+        border-radius: 12px;
+        border: 1px solid var(--border);
+    }
+
+    /* Success/Error/Warning boxes */
+    .stSuccess, .stWarning, .stError, .stInfo {
+        border-radius: 10px;
+    }
+
+    /* Footer */
+    footer {
+        visibility: hidden;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: var(--bg-secondary);
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-cyan);
+    }
+
+    /* Grid Lines */
+    .element-container {
+        margin-bottom: 1rem;
+    }
+
+    /* Metric Labels */
+    [data-testid="stMetricLabel"] {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+    [data-testid="stMetricValue"] {
+        color: var(--accent-cyan);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.5rem;
+    }
+
+    /* Divider */
+    hr {
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--border), transparent);
+        margin: 2rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ======================
 # LOAD DATA
 # ======================
-df = pd.read_csv("data/CC GENERAL.csv")
+import os
+data_path = os.path.join(os.path.dirname(__file__), "..", "data", "CC GENERAL.csv")
+df = pd.read_csv(data_path)
 
 # ======================
 # HELPER FUNCTIONS
@@ -69,19 +279,53 @@ def get_cluster_info(cluster_id):
     return cluster_info.get(cluster_id, cluster_info[0])
 
 # ======================
-# SIDEBAR
+# CLUSTER CONFIGURATION
 # ======================
+# Cluster-specific colors and names
+CLUSTER_CONFIG = {
+    0: {"name": "High Value Customers", "name_vn": "Khach Hang Gia Tri Cao", "color": "#ffd700", "glow": "0 0 20px rgba(255, 215, 0, 0.3)"},
+    1: {"name": "Low Activity", "name_vn": "Khach Hang It Hoat Dong", "color": "#6a6a8a", "glow": "0 0 20px rgba(106, 106, 138, 0.3)"},
+    2: {"name": "Cash Advance", "name_vn": "Khach Hang Rut Tien Mat", "color": "#ff4444", "glow": "0 0 20px rgba(255, 68, 68, 0.3)"},
+    3: {"name": "Potential Premium", "name_vn": "Khach Hang Premium Tien Nang", "color": "#da70d6", "glow": "0 0 20px rgba(218, 112, 214, 0.3)"}
+}  # Orchid/Purple
+
 with st.sidebar:
-    st.markdown("### 💳 Menu")
+    st.markdown("""
+    <div style="text-align: center; padding: 20px 0;">
+        <h2 style="background: linear-gradient(135deg, #00f0ff, #ff00aa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
+            ◈ SEGMENT
+        </h2>
+        <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 5px;">
+            Customer Analytics
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
     page = st.radio(
         "",
-        ["🏠 Overview", "📊 Visualization", "🔮 Cluster Analysis", "🎯 Prediction"]
+        [
+            "◈ Overview",
+            "◈ Visualization",
+            "◈ Cluster Analysis",
+            "◈ Prediction"
+        ],
+        label_visibility="hidden"
     )
+
+    st.markdown("---")
+
+    # Model status indicator
+    if models_loaded:
+        st.success("✓ Models Loaded")
+    else:
+        st.warning("○ Models Pending")
 
 # ======================
 # OVERVIEW PAGE
 # ======================
-if page == "🏠 Overview":
+if page == "◈ Overview":
 
     st.markdown('<h1 class="main-title">Credit Card Customer Segmentation</h1>', unsafe_allow_html=True)
 
@@ -137,7 +381,7 @@ if page == "🏠 Overview":
 # ======================
 # VISUALIZATION PAGE (Boxplot & Histogram)
 # ======================
-elif page == "📊 Visualization":
+elif page == "◈ Visualization":
 
     st.markdown('<h1 class="main-title">Data Visualization</h1>', unsafe_allow_html=True)
 
@@ -147,18 +391,24 @@ elif page == "📊 Visualization":
     st.markdown("---")
 
     # Toggle between Boxplot and Histogram
-    chart_type = st.radio("Chọn loại chart", ["📦 Boxplot", "📈 Histogram"], horizontal=True)
+    chart_type = st.radio("Chọn loại chart", [" Boxplot", " Histogram"], horizontal=True)
 
     st.markdown("---")
 
-    if chart_type == "📦 Boxplot":
+    if chart_type == " Boxplot":
         st.markdown('<p class="section-header">Boxplot - Outlier Detection</p>', unsafe_allow_html=True)
 
         # Single boxplot
         fig, ax = plt.subplots(figsize=(12, 5))
-        sns.boxplot(y=df[feature], color='#667eea', ax=ax)
-        ax.set_title(f'{feature} Distribution', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Value')
+        sns.boxplot(y=df[feature], color='#00f0ff', ax=ax)
+        ax.set_title(f'{feature} Distribution', fontsize=14, fontweight='bold', color='white')
+        ax.set_ylabel('Value', color='white')
+        ax.set_xlabel('')
+        ax.tick_params(colors='white')
+        ax.set_facecolor('#12121a')
+        fig.patch.set_facecolor('#0a0a0f')
+        for spine in ax.spines.values():
+            spine.set_color('#2a2a3a')
         st.pyplot(fig)
 
         # Outlier analysis
@@ -201,11 +451,18 @@ elif page == "📊 Visualization":
 
         # Single histogram
         fig, ax = plt.subplots(figsize=(12, 5))
-        sns.histplot(df[feature], bins=30, kde=True, color='#667eea', ax=ax)
-        ax.axvline(df[feature].mean(), color='red', linestyle='--', label=f'Mean: ${df[feature].mean():.2f}')
-        ax.axvline(df[feature].median(), color='green', linestyle='--', label=f'Median: ${df[feature].median():.2f}')
+        sns.histplot(df[feature], bins=30, kde=True, color='#00f0ff', ax=ax, alpha=0.7)
+        ax.axvline(df[feature].mean(), color='#ff00aa', linestyle='--', linewidth=2, label=f'Mean: ${df[feature].mean():.2f}')
+        ax.axvline(df[feature].median(), color='#ffd700', linestyle='--', linewidth=2, label=f'Median: ${df[feature].median():.2f}')
         ax.legend()
-        ax.set_title(f'{feature} Distribution', fontsize=14, fontweight='bold')
+        ax.set_title(f'{feature} Distribution', fontsize=14, fontweight='bold', color='white')
+        ax.set_ylabel('Count', color='white')
+        ax.set_xlabel('Value', color='white')
+        ax.tick_params(colors='white')
+        ax.set_facecolor('#12121a')
+        fig.patch.set_facecolor('#0a0a0f')
+        for spine in ax.spines.values():
+            spine.set_color('#2a2a3a')
         st.pyplot(fig)
 
         # Statistics
@@ -248,154 +505,332 @@ elif page == "📊 Visualization":
 # ======================
 # CLUSTER ANALYSIS PAGE
 # ======================
-elif page == "🔮 Cluster Analysis":
+elif page == "◈ Cluster Analysis":
 
     st.markdown('<h1 class="main-title">Cluster Analysis</h1>', unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="insight-box">
-        <p>Phân tích chi tiết 4 nhóm khách hàng được phân cụm bằng K-Means.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    feature_cols = ['BALANCE', 'PURCHASES', 'CREDIT_LIMIT', 'PAYMENTS']
 
-    st.markdown("---")
+    if not models_loaded:
+        st.warning("Models chua duoc load. Hien tai hien thi phan bo mau.")
 
-    # Cluster tabs
-    tab0, tab1, tab2, tab3 = st.tabs(["Cluster 0", "Cluster 1", "Cluster 2", "Cluster 3"])
+        st.markdown("---")
+        st.markdown('<p class="section-header">Cluster Distribution (Sample)</p>', unsafe_allow_html=True)
 
-    clusters = [
-        {"name": "High Value Customers", "desc": "Khách hàng giá trị cao với số dư và mua sắm cao",
-         "chars": ["Số dư cao", "Mua sắm tích cực", "Thanh toán đều đặn"]},
-        {"name": "Low Activity Customers", "desc": "Khách hàng ít hoạt động với số dư và mua sắm thấp",
-         "chars": ["Số dư thấp", "Mua sắm hạn chế", "Tiềm năng phát triển"]},
-        {"name": "Cash Advance Users", "desc": "Khách hàng thường xuyên rút tiền mặt",
-         "chars": ["Rút tiền mặt thường xuyên", "Phí cao", "Rủi ro tài chính"]},
-        {"name": "Potential Premium", "desc": "Khách hàng có hành vi tốt và hạn mức cao",
-         "chars": ["Thanh toán đầy đủ", "Hạn mức cao", "Tiềm năng nâng hạng"]}
-    ]
+        np.random.seed(42)
+        sample_clusters = np.random.randint(0, 4, size=len(df))
+        cluster_counts = pd.Series(sample_clusters).value_counts().sort_index().values
+        cluster_names = ['Cluster 0', 'Cluster 1', 'Cluster 2', 'Cluster 3']
 
-    with tab0:
-        st.markdown(f"### {clusters[0]['name']}")
-        st.markdown(f"**{clusters[0]['desc']}**")
-        st.markdown("**Đặc điểm:**")
-        for c in clusters[0]['chars']:
-            st.write(f"- {c}")
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        colors = ['#00f0ff', '#ff00aa', '#ffd700', '#00ff88']
 
-    with tab1:
-        st.markdown(f"### {clusters[1]['name']}")
-        st.markdown(f"**{clusters[1]['desc']}**")
-        st.markdown("**Đặc điểm:**")
-        for c in clusters[1]['chars']:
-            st.write(f"- {c}")
+        axes[0].pie(cluster_counts, labels=cluster_names, autopct='%1.1f%%',
+                   colors=colors, explode=[0.02]*4, shadow=True, startangle=90)
+        axes[0].set_title('Cluster Distribution (Pie)')
 
-    with tab2:
-        st.markdown(f"### {clusters[2]['name']}")
-        st.markdown(f"**{clusters[2]['desc']}**")
-        st.markdown("**Đặc điểm:**")
-        for c in clusters[2]['chars']:
-            st.write(f"- {c}")
+        bars = axes[1].bar(cluster_names, cluster_counts, color=colors, edgecolor='black')
+        axes[1].set_ylabel('So luong khach hang')
+        for bar, count in zip(bars, cluster_counts):
+            axes[1].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 30,
+                    str(count), ha='center', fontweight='bold')
+        plt.tight_layout()
+        st.pyplot(fig)
 
-    with tab3:
-        st.markdown(f"### {clusters[3]['name']}")
-        st.markdown(f"**{clusters[3]['desc']}**")
-        st.markdown("**Đặc điểm:**")
-        for c in clusters[3]['chars']:
-            st.write(f"- {c}")
+    else:
+        from sklearn.preprocessing import StandardScaler
 
-    st.markdown("---")
+        st.markdown("""
+        <div class="insight-box">
+            <p>Phan tich chi tiet 4 nhom khach hang duoc phan cum bang K-Means.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Cluster distribution chart (simulated)
-    st.markdown('<p class="section-header">Cluster Distribution</p>', unsafe_allow_html=True)
+        X = df[feature_cols].fillna(df[feature_cols].mean())
+        scaler_analysis = StandardScaler()
+        X_scaled = scaler_analysis.fit_transform(X)
+        df['Cluster'] = kmeans.predict(X_scaled)
 
-    cluster_counts = [2250, 1850, 2550, 2300]
-    cluster_names = ['Cluster 0', 'Cluster 1', 'Cluster 2', 'Cluster 3']
+        st.markdown("---")
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4']
-    bars = ax.bar(cluster_names, cluster_counts, color=colors, edgecolor='black')
-    ax.set_ylabel('Số lượng khách hàng')
-    ax.set_title('Customer Distribution by Cluster')
+        col1, col2, col3, col4 = st.columns(4)
+        cluster_counts = df['Cluster'].value_counts().sort_index()
+        total = len(df)
 
-    for bar, count in zip(bars, cluster_counts):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 30,
-                str(count), ha='center', va='bottom', fontweight='bold')
-    st.pyplot(fig)
+        for col, cid in zip([col1, col2, col3, col4], range(4)):
+            cnt = cluster_counts.get(cid, 0)
+            pct = cnt / total * 100
+            with col:
+                st.metric(f"Cluster {cid}", f"{cnt}", f"{pct:.1f}%")
+
+        # Statistics table
+        st.markdown("---")
+        st.markdown('<p class="section-header">Cluster Statistics</p>', unsafe_allow_html=True)
+
+        cluster_summary = df.groupby('Cluster')[feature_cols].agg(['mean', 'median']).round(2)
+        cluster_summary.columns = ['_'.join(col) for col in cluster_summary.columns]
+        st.dataframe(cluster_summary, use_container_width=True)
+
+        # Charts
+        st.markdown("---")
+        chart_type = st.selectbox("Chon loai bieu do", ["Pie Chart", "Bar Chart", "Box Plot", "Heatmap"])
+
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        colors = ['#00f0ff', '#ff00aa', '#ffd700', '#00ff88']
+
+        if chart_type == "Pie Chart":
+            axes[0].pie(cluster_counts.values, labels=[f'Cluster {i}' for i in cluster_counts.index],
+                       autopct='%1.1f%%', colors=colors[:len(cluster_counts)],
+                       explode=[0.02]*len(cluster_counts), shadow=True, startangle=90)
+            axes[0].set_title('Cluster Distribution')
+        elif chart_type == "Bar Chart":
+            bars = axes[0].bar([f'Cluster {i}' for i in cluster_counts.index], cluster_counts.values,
+                              color=colors[:len(cluster_counts)], edgecolor='black')
+            axes[0].set_ylabel('So luong khach hang')
+            for bar, cnt in zip(bars, cluster_counts.values):
+                axes[0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 30,
+                        str(cnt), ha='center', fontweight='bold')
+        elif chart_type == "Box Plot":
+            df_melted = df.melt(id_vars=['Cluster'], value_vars=feature_cols,
+                               var_name='Feature', value_name='Value')
+            sns.boxplot(data=df_melted, x='Feature', y='Value', hue='Cluster',
+                       palette=colors, ax=axes[0])
+            axes[0].legend(title='Cluster')
+        else:
+            cluster_means = df.groupby('Cluster')[feature_cols].mean()
+            cluster_norm = (cluster_means - cluster_means.min()) / (cluster_means.max() - cluster_means.min())
+            sns.heatmap(cluster_norm, annot=True, fmt='.2f', cmap='YlOrRd',
+                       ax=axes[0], cbar_kws={'label': 'Normalized'})
+
+        # Feature comparison
+        for feat in feature_cols:
+            means = df.groupby('Cluster')[feat].mean()
+            axes[1].plot(means.index, means.values, 'o-', label=feat, linewidth=2, markersize=8)
+        axes[1].set_xlabel('Cluster')
+        axes[1].set_ylabel('Gia tri trung binh')
+        axes[1].legend(loc='best')
+        axes[1].set_xticks(range(4))
+        axes[1].grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        # Cluster details tabs
+        st.markdown("---")
+        st.markdown('<p class="section-header">Cluster Details</p>', unsafe_allow_html=True)
+
+        # Custom styled tabs
+        tab_labels = ["◈ Cluster 0", "◈ Cluster 1", "◈ Cluster 2", "◈ Cluster 3"]
+        tabs = st.tabs(tab_labels)
+
+        for tab, cid in zip(tabs, [0, 1, 2, 3]):
+            config = CLUSTER_CONFIG[cid]
+            with tab:
+                cluster_data = df[df['Cluster'] == cid]
+
+                # Cluster header card
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {config['color']}15, {config['color']}05);
+                           padding: 25px; border-radius: 15px; border: 1px solid {config['color']}50;
+                           margin-bottom: 20px;">
+                    <h2 style="color: {config['color']}; margin: 0 0 10px 0; font-size: 1.5rem;">
+                        {config['name']}
+                    </h2>
+                    <p style="color: #8a8a9a; margin: 0;">
+                        {config['name_vn']} | {len(cluster_data)} customers ({len(cluster_data)/total*100:.1f}%)
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    for feat in feature_cols:
+                        st.metric(f"Avg {feat}", f"${cluster_data[feat].mean():,.2f}")
+                with col2:
+                    for feat in feature_cols:
+                        st.metric(f"Med {feat}", f"${cluster_data[feat].median():,.2f}")
+
+                # Bar chart cho cluster
+                fig, ax = plt.subplots(figsize=(8, 4))
+                means = cluster_data[feature_cols].mean()
+                ax.barh(feature_cols, means.values, color=config['color'], edgecolor='white', alpha=0.8)
+                ax.set_xlabel('Gia tri trung binh', color='white')
+                ax.set_title(f'Cluster {cid} - Feature Means', color='white')
+                ax.tick_params(colors='white')
+                ax.set_facecolor('#12121a')
+                fig.patch.set_facecolor('#0a0a0f')
+                for spine in ax.spines.values():
+                    spine.set_color('#2a2a3a')
+                for i, v in enumerate(means.values):
+                    ax.text(v + 50, i, f'${v:,.0f}', va='center', color='white')
+                st.pyplot(fig)
 
 # ======================
 # PREDICTION PAGE
 # ======================
-elif page == "🎯 Prediction":
+elif page == "◈ Prediction":
 
     st.markdown('<h1 class="main-title">Customer Prediction</h1>', unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="insight-box">
-        <p>Nhập thông tin khách hàng để dự đoán cluster.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown('<p class="section-header">Customer Information</p>', unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        balance = st.number_input("BALANCE (Số dư)", min_value=0.0, value=1000.0, step=100.0)
-        purchases = st.number_input("PURCHASES (Mua hàng)", min_value=0.0, value=500.0, step=100.0)
-
-    with col2:
-        credit_limit = st.number_input("CREDIT_LIMIT (Hạn mức)", min_value=0.0, value=3000.0, step=100.0)
-        payments = st.number_input("PAYMENTS (Thanh toán)", min_value=0.0, value=1000.0, step=100.0)
-
-    st.markdown("---")
-
-    if st.button("🔮 Predict", use_container_width=True):
-        # Simple rule-based prediction
-        if balance > 3000 and purchases > 3000:
-            result = 0
-        elif balance < 1000 and purchases < 1000:
-            result = 1
-        elif credit_limit > 10000 and payments > 2000:
-            result = 3
-        else:
-            result = 2
-
-        info = get_cluster_info(result)
-
-        st.markdown("---")
-        st.markdown('<p class="section-header">Prediction Result</p>', unsafe_allow_html=True)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.success(f"### Cluster {result}")
-        with col2:
-            st.info(f"**{info['name']}**")
-
-        st.markdown(f"""
+    if not models_loaded:
+        st.warning("⚠️ Models chưa được load. Vui lòng chạy notebook để train và lưu models trước.")
+    else:
+        st.markdown("""
         <div class="insight-box">
-            <p><strong>Mô tả:</strong> {info['desc']}</p>
+            <p>Nhập thông tin khách hàng để dự đoán cluster bằng 3 mô hình: KNN, Decision Tree, Random Forest.</p>
         </div>
         """, unsafe_allow_html=True)
 
-        # Insights
         st.markdown("---")
-        st.markdown('<p class="section-header">Analysis</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-header">Customer Information</p>', unsafe_allow_html=True)
 
-        if purchases > 5000:
-            st.success("✅ High purchasing activity detected")
-        if credit_limit > 10000:
-            st.info("ℹ️ High credit limit")
-        if payments < 500:
-            st.warning("⚠️ Low payment detected")
-        if balance > 10000:
-            st.error("🔴 High outstanding balance")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            balance = st.number_input("BALANCE (Số dư)", min_value=0.0, value=1000.0, step=100.0)
+            purchases = st.number_input("PURCHASES (Mua hàng)", min_value=0.0, value=500.0, step=100.0)
+
+        with col2:
+            credit_limit = st.number_input("CREDIT_LIMIT (Hạn mức)", min_value=0.0, value=3000.0, step=100.0)
+            payments = st.number_input("PAYMENTS (Thanh toán)", min_value=0.0, value=1000.0, step=100.0)
+
+        st.markdown("---")
+
+        if st.button("Predict", use_container_width=True):
+            # Prepare input data
+            new_customer = np.array([[balance, purchases, credit_limit, payments]])
+            new_customer_scaled = scaler.transform(new_customer)
+
+            # Predict with all models
+            knn_result = int(knn_model.predict(new_customer_scaled)[0])
+            tree_result = int(tree_model.predict(new_customer_scaled)[0])
+            rf_result = int(rf_model.predict(new_customer_scaled)[0])
+
+            st.markdown("---")
+            st.markdown('<p class="section-header">Prediction Results</p>', unsafe_allow_html=True)
+
+            # Display results in columns
+            col1, col2, col3 = st.columns(3)
+
+            knn_info = get_cluster_info(knn_result)
+            tree_info = get_cluster_info(tree_result)
+            rf_info = get_cluster_info(rf_result)
+
+            with col1:
+                cluster_config = CLUSTER_CONFIG[knn_result]
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {cluster_config['color']}20, {cluster_config['color']}05);
+                           padding:25px; border-radius:15px; text-align:center; border: 2px solid {cluster_config['color']}60;
+                           box-shadow: {cluster_config['glow']};">
+                    <h3 style="color: #00f0ff; margin: 0 0 10px 0; font-size: 0.9rem;">KNN</h3>
+                    <div style="font-size: 4rem; font-weight: 700; color: {cluster_config['color']};">{knn_result}</div>
+                    <div style="height: 3px; background: {cluster_config['color']}; margin: 10px 0; border-radius: 2px;"></div>
+                    <p style="color: {cluster_config['color']}; margin: 0; font-weight: 600; font-size: 0.85rem;">{cluster_config['name']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                cluster_config = CLUSTER_CONFIG[tree_result]
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {cluster_config['color']}20, {cluster_config['color']}05);
+                           padding:25px; border-radius:15px; text-align:center; border: 2px solid {cluster_config['color']}60;
+                           box-shadow: {cluster_config['glow']};">
+                    <h3 style="color: #00ff88; margin: 0 0 10px 0; font-size: 0.9rem;">Decision Tree</h3>
+                    <div style="font-size: 4rem; font-weight: 700; color: {cluster_config['color']};">{tree_result}</div>
+                    <div style="height: 3px; background: {cluster_config['color']}; margin: 10px 0; border-radius: 2px;"></div>
+                    <p style="color: {cluster_config['color']}; margin: 0; font-weight: 600; font-size: 0.85rem;">{cluster_config['name']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                cluster_config = CLUSTER_CONFIG[rf_result]
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {cluster_config['color']}20, {cluster_config['color']}05);
+                           padding:25px; border-radius:15px; text-align:center; border: 2px solid {cluster_config['color']}60;
+                           box-shadow: {cluster_config['glow']};">
+                    <h3 style="color: #ff00aa; margin: 0 0 10px 0; font-size: 0.9rem;">Random Forest</h3>
+                    <div style="font-size: 4rem; font-weight: 700; color: {cluster_config['color']};">{rf_result}</div>
+                    <div style="height: 3px; background: {cluster_config['color']}; margin: 10px 0; border-radius: 2px;"></div>
+                    <p style="color: {cluster_config['color']}; margin: 0; font-weight: 600; font-size: 0.85rem;">{cluster_config['name']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Final prediction summary
+            results = [knn_result, tree_result, rf_result]
+            if len(set(results)) == 1:
+                final_cluster = knn_result
+                cluster_config = CLUSTER_CONFIG[final_cluster]
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {cluster_config['color']}30, {cluster_config['color']}10);
+                           padding: 30px; border-radius: 20px; text-align: center;
+                           border: 2px solid {cluster_config['color']}; margin: 20px 0;">
+                    <h2 style="color: {cluster_config['color']}; margin: 0 0 15px 0; font-size: 1.8rem;">
+                        Final Prediction
+                    </h2>
+                    <div style="font-size: 1.2rem; color: white; margin-bottom: 15px;">
+                        Customer belongs to <strong style="color: {cluster_config['color']};">{cluster_config['name']}</strong>
+                    </div>
+                    <div style="font-size: 0.95rem; color: #8a8a9a; line-height: 1.6;">
+                        {cluster_config['name_vn']}
+                    </div>
+                    <div style="height: 3px; background: linear-gradient(90deg, transparent, {cluster_config['color']}, transparent); margin: 20px 0;"></div>
+                    <p style="color: #8a8a9a; margin: 0; font-size: 0.85rem;">
+                        ✓ All 3 models agree
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="background: #ff444430; padding: 25px; border-radius: 15px;
+                           border: 1px solid #ff4444; margin: 20px 0;">
+                    <h3 style="color: #ff4444; margin: 0 0 15px 0;">⚠️ Model Disagreement</h3>
+                    <p style="color: #8a8a9a; margin: 0 0 15px 0;">Different models predicted different clusters:</p>
+                """, unsafe_allow_html=True)
+
+            # Insights
+            st.markdown("---")
+            st.markdown('<p class="section-header">Customer Analysis</p>', unsafe_allow_html=True)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if purchases > 5000:
+                    st.markdown("""
+                    <div style="background: #00ff8820; padding: 15px 20px; border-radius: 10px; border-left: 4px solid #00ff88;">
+                        <strong style="color: #00ff88;">High Purchasing Activity</strong>
+                        <p style="color: #8a8a9a; margin: 5px 0 0 0;">Purchases exceed $5,000 threshold</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                if credit_limit > 10000:
+                    st.markdown("""
+                    <div style="background: #ffd70020; padding: 15px 20px; border-radius: 10px; border-left: 4px solid #ffd700;">
+                        <strong style="color: #ffd700;">High Credit Limit</strong>
+                        <p style="color: #8a8a9a; margin: 5px 0 0 0;">Credit limit exceeds $10,000</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            with col2:
+                if payments < 500:
+                    st.markdown("""
+                    <div style="background: #ff444420; padding: 15px 20px; border-radius: 10px; border-left: 4px solid #ff4444;">
+                        <strong style="color: #ff4444;">Low Payment</strong>
+                        <p style="color: #8a8a9a; margin: 5px 0 0 0;">Payments below $500 - need attention</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                if balance > 10000:
+                    st.markdown("""
+                    <div style="background: #ff00aa20; padding: 15px 20px; border-radius: 10px; border-left: 4px solid #ff00aa;">
+                        <strong style="color: #ff00aa;">High Outstanding Balance</strong>
+                        <p style="color: #8a8a9a; margin: 5px 0 0 0;">Balance exceeds $10,000 - risk indicator</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 # ======================
 # FOOTER
 # ======================
-st.markdown("---")
 st.markdown("""
-<div style="text-align: center; padding: 20px; color: #888;">
-    <p>Credit Card Customer Segmentation | ML Project 2024</p>
+<div style="text-align: center; padding: 30px 0; color: #5a5a6a; border-top: 1px solid #2a2a3a; margin-top: 50px;">
+    <p style="font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;">
+        ◈ Neural Analytics | Customer Segmentation System
+    </p>
 </div>
 """, unsafe_allow_html=True)
