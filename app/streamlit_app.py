@@ -20,8 +20,19 @@ try:
     scaler = joblib.load(os.path.join(models_dir, "scaler.pkl"))
     kmeans = joblib.load(os.path.join(models_dir, "kmeans.pkl"))
     knn_model = joblib.load(os.path.join(models_dir, "knn.pkl"))
+    
     tree_model = joblib.load(os.path.join(models_dir, "tree.pkl"))
+    if not hasattr(tree_model, "monotonic_cst"):
+        tree_model.monotonic_cst = None
+        
     rf_model = joblib.load(os.path.join(models_dir, "rf.pkl"))
+    if not hasattr(rf_model, "monotonic_cst"):
+        rf_model.monotonic_cst = None
+    if hasattr(rf_model, "estimators_"):
+        for estimator in rf_model.estimators_:
+            if not hasattr(estimator, "monotonic_cst"):
+                estimator.monotonic_cst = None
+        
     models_loaded = True
 except:
     models_loaded = False
@@ -168,8 +179,9 @@ st.markdown("""
         font-weight: 500;
     }
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta)) !important;
-        color: white !important;
+        background: var(--accent-cyan) !important;
+        color: var(--bg-primary) !important;
+        border-radius: 8px;
     }
 
     /* Buttons */
@@ -266,13 +278,17 @@ import os
 data_path = os.path.join(os.path.dirname(__file__), "..", "data", "CC GENERAL.csv")
 df = pd.read_csv(data_path)
 
+# Drop CUST_ID as it's not numeric
+if 'CUST_ID' in df.columns:
+    df = df.drop('CUST_ID', axis=1)
+
 # ======================
 # HELPER FUNCTIONS
 # ======================
 def get_cluster_info(cluster_id):
     cluster_info = {
-        0: {"name": "High Value Customers", "desc": "Khách hàng giá trị cao"},
-        1: {"name": "Low Activity Customers", "desc": "Khách hàng ít hoạt động"},
+        0: {"name": "Low Activity Customers", "desc": "Khách hàng ít hoạt động"},
+        1: {"name": "High Value Customers", "desc": "Khách hàng giá trị cao"},
         2: {"name": "Cash Advance Users", "desc": "Khách hàng rút tiền mặt"},
         3: {"name": "Potential Premium", "desc": "Khách hàng Premium tiềm năng"}
     }
@@ -283,11 +299,11 @@ def get_cluster_info(cluster_id):
 # ======================
 # Cluster-specific colors and names
 CLUSTER_CONFIG = {
-    0: {"name": "High Value Customers", "name_vn": "Khach Hang Gia Tri Cao", "color": "#ffd700", "glow": "0 0 20px rgba(255, 215, 0, 0.3)"},
-    1: {"name": "Low Activity", "name_vn": "Khach Hang It Hoat Dong", "color": "#6a6a8a", "glow": "0 0 20px rgba(106, 106, 138, 0.3)"},
-    2: {"name": "Cash Advance", "name_vn": "Khach Hang Rut Tien Mat", "color": "#ff4444", "glow": "0 0 20px rgba(255, 68, 68, 0.3)"},
-    3: {"name": "Potential Premium", "name_vn": "Khach Hang Premium Tien Nang", "color": "#da70d6", "glow": "0 0 20px rgba(218, 112, 214, 0.3)"}
-}  # Orchid/Purple
+    0: {"name": "Low Activity Customers", "name_vn": "Khách Hàng Ít Hoạt Động", "color": "#ff00aa", "glow": "0 0 20px rgba(255, 0, 170, 0.3)"},
+    1: {"name": "High Value Customers", "name_vn": "Khách Hàng Giá Trị Cao", "color": "#00f0ff", "glow": "0 0 20px rgba(0, 240, 255, 0.3)"},
+    2: {"name": "Cash Advance Users", "name_vn": "Khách Hàng Rút Tiền Mặt", "color": "#ffd700", "glow": "0 0 20px rgba(255, 215, 0, 0.3)"},
+    3: {"name": "Potential Premium", "name_vn": "Khách Hàng Premium Tiềm Năng", "color": "#00ff88", "glow": "0 0 20px rgba(0, 255, 136, 0.3)"}
+}
 
 with st.sidebar:
     st.markdown("""
@@ -538,18 +554,29 @@ elif page == "◈ Cluster Analysis":
         st.pyplot(fig)
 
     else:
-        from sklearn.preprocessing import StandardScaler
+        # Preprocessing: Same as train_models.py
+        feature_cols = ['BALANCE', 'PURCHASES', 'CREDIT_LIMIT', 'PAYMENTS']
 
-        st.markdown("""
-        <div class="insight-box">
-            <p>Phan tich chi tiet 4 nhom khach hang duoc phan cum bang K-Means.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Create df_log for cluster prediction
+        df_for_cluster = df.copy()
 
-        X = df[feature_cols].fillna(df[feature_cols].mean())
-        scaler_analysis = StandardScaler()
-        X_scaled = scaler_analysis.fit_transform(X)
-        df['Cluster'] = kmeans.predict(X_scaled)
+        # Log transform only numeric columns (same as notebook/train_models.py)
+        df_for_cluster[feature_cols] = np.log1p(df_for_cluster[feature_cols])
+
+        # Fill missing values for numeric columns only
+        for feat in feature_cols:
+            df_for_cluster[feat] = df_for_cluster[feat].fillna(df_for_cluster[feat].mean())
+
+        # Use the SAVED scaler (not a new one!)
+        X = df_for_cluster[feature_cols]
+        X_scaled = scaler.transform(X)
+
+        # Predict clusters using trained kmeans
+        cluster_labels = kmeans.predict(X_scaled)
+
+        # Assign cluster labels to dataframe
+        df['Cluster'] = cluster_labels
+        feature_cols_display = ['BALANCE', 'PURCHASES', 'CREDIT_LIMIT', 'PAYMENTS']
 
         st.markdown("---")
 
@@ -573,47 +600,98 @@ elif page == "◈ Cluster Analysis":
 
         # Charts
         st.markdown("---")
-        chart_type = st.selectbox("Chon loai bieu do", ["Pie Chart", "Bar Chart", "Box Plot", "Heatmap"])
+        chart_type = st.selectbox("Chon loai bieu do", ["Pie Chart", "Bar Chart", "Box Plot", "Heatmap", "3D Cluster Plot"])
 
-        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         colors = ['#00f0ff', '#ff00aa', '#ffd700', '#00ff88']
 
-        if chart_type == "Pie Chart":
-            axes[0].pie(cluster_counts.values, labels=[f'Cluster {i}' for i in cluster_counts.index],
-                       autopct='%1.1f%%', colors=colors[:len(cluster_counts)],
-                       explode=[0.02]*len(cluster_counts), shadow=True, startangle=90)
-            axes[0].set_title('Cluster Distribution')
-        elif chart_type == "Bar Chart":
-            bars = axes[0].bar([f'Cluster {i}' for i in cluster_counts.index], cluster_counts.values,
-                              color=colors[:len(cluster_counts)], edgecolor='black')
-            axes[0].set_ylabel('So luong khach hang')
-            for bar, cnt in zip(bars, cluster_counts.values):
-                axes[0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 30,
-                        str(cnt), ha='center', fontweight='bold')
-        elif chart_type == "Box Plot":
-            df_melted = df.melt(id_vars=['Cluster'], value_vars=feature_cols,
-                               var_name='Feature', value_name='Value')
-            sns.boxplot(data=df_melted, x='Feature', y='Value', hue='Cluster',
-                       palette=colors, ax=axes[0])
-            axes[0].legend(title='Cluster')
+        if chart_type == "3D Cluster Plot":
+            import plotly.express as px
+            plot_df = df.copy()
+            cluster_names_map = {
+                0: "Cluster 0: Low Activity",
+                1: "Cluster 1: High Value",
+                2: "Cluster 2: Cash Advance",
+                3: "Cluster 3: Potential Premium"
+            }
+            plot_df['Customer Segment'] = plot_df['Cluster'].map(cluster_names_map)
+            
+            fig_3d = px.scatter_3d(
+                plot_df,
+                x='BALANCE',
+                y='PURCHASES',
+                z='CREDIT_LIMIT',
+                color='Customer Segment',
+                color_discrete_map={
+                    "Cluster 0: Low Activity": '#ff00aa',
+                    "Cluster 1: High Value": '#00f0ff',
+                    "Cluster 2: Cash Advance": '#ffd700',
+                    "Cluster 3: Potential Premium": '#00ff88'
+                },
+                hover_data=['PAYMENTS', 'TENURE'],
+                labels={
+                    'BALANCE': 'Balance ($)',
+                    'PURCHASES': 'Purchases ($)',
+                    'CREDIT_LIMIT': 'Credit Limit ($)'
+                },
+                height=700
+            )
+            fig_3d.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="Space Grotesk, sans-serif", color='#ffffff'),
+                scene=dict(
+                    xaxis=dict(backgroundcolor="#12121a", gridcolor="#2a2a3a", showbackground=True),
+                    yaxis=dict(backgroundcolor="#12121a", gridcolor="#2a2a3a", showbackground=True),
+                    zaxis=dict(backgroundcolor="#12121a", gridcolor="#2a2a3a", showbackground=True),
+                ),
+                margin=dict(l=0, r=0, b=0, t=30),
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01,
+                    bgcolor="rgba(10,10,15,0.8)"
+                )
+            )
+            st.plotly_chart(fig_3d, use_container_width=True)
         else:
-            cluster_means = df.groupby('Cluster')[feature_cols].mean()
-            cluster_norm = (cluster_means - cluster_means.min()) / (cluster_means.max() - cluster_means.min())
-            sns.heatmap(cluster_norm, annot=True, fmt='.2f', cmap='YlOrRd',
-                       ax=axes[0], cbar_kws={'label': 'Normalized'})
+            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+            if chart_type == "Pie Chart":
+                axes[0].pie(cluster_counts.values, labels=[f'Cluster {i}' for i in cluster_counts.index],
+                           autopct='%1.1f%%', colors=colors[:len(cluster_counts)],
+                           explode=[0.02]*len(cluster_counts), shadow=True, startangle=90)
+                axes[0].set_title('Cluster Distribution')
+            elif chart_type == "Bar Chart":
+                bars = axes[0].bar([f'Cluster {i}' for i in cluster_counts.index], cluster_counts.values,
+                                  color=colors[:len(cluster_counts)], edgecolor='black')
+                axes[0].set_ylabel('So luong khach hang')
+                for bar, cnt in zip(bars, cluster_counts.values):
+                    axes[0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 30,
+                            str(cnt), ha='center', fontweight='bold')
+            elif chart_type == "Box Plot":
+                df_melted = df.melt(id_vars=['Cluster'], value_vars=feature_cols,
+                                   var_name='Feature', value_name='Value')
+                sns.boxplot(data=df_melted, x='Feature', y='Value', hue='Cluster',
+                           palette=colors, ax=axes[0])
+                axes[0].legend(title='Cluster')
+            else:
+                cluster_means = df.groupby('Cluster')[feature_cols].mean()
+                cluster_norm = (cluster_means - cluster_means.min()) / (cluster_means.max() - cluster_means.min())
+                sns.heatmap(cluster_norm, annot=True, fmt='.2f', cmap='YlOrRd',
+                           ax=axes[0], cbar_kws={'label': 'Normalized'})
 
-        # Feature comparison
-        for feat in feature_cols:
-            means = df.groupby('Cluster')[feat].mean()
-            axes[1].plot(means.index, means.values, 'o-', label=feat, linewidth=2, markersize=8)
-        axes[1].set_xlabel('Cluster')
-        axes[1].set_ylabel('Gia tri trung binh')
-        axes[1].legend(loc='best')
-        axes[1].set_xticks(range(4))
-        axes[1].grid(True, alpha=0.3)
+            # Feature comparison
+            for feat in feature_cols:
+                means = df.groupby('Cluster')[feat].mean()
+                axes[1].plot(means.index, means.values, 'o-', label=feat, linewidth=2, markersize=8)
+            axes[1].set_xlabel('Cluster')
+            axes[1].set_ylabel('Gia tri trung binh')
+            axes[1].legend(loc='best')
+            axes[1].set_xticks(range(4))
+            axes[1].grid(True, alpha=0.3)
 
-        plt.tight_layout()
-        st.pyplot(fig)
+            plt.tight_layout()
+            st.pyplot(fig)
 
         # Cluster details tabs
         st.markdown("---")
@@ -697,9 +775,14 @@ elif page == "◈ Prediction":
         st.markdown("---")
 
         if st.button("Predict", use_container_width=True):
-            # Prepare input data
+            # Create input array
             new_customer = np.array([[balance, purchases, credit_limit, payments]])
-            new_customer_scaled = scaler.transform(new_customer)
+
+            # Apply log transform (same as training)
+            new_customer_log = np.log1p(new_customer)
+
+            # Prepare input data with scaling
+            new_customer_scaled = scaler.transform(new_customer_log)
 
             # Predict with all models
             knn_result = int(knn_model.predict(new_customer_scaled)[0])
